@@ -1,0 +1,1311 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Планировщик сборки PRO</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+:root {
+  --bg: #0f1117;
+  --bg2: #161b27;
+  --bg3: #1e2535;
+  --border: rgba(255,255,255,0.07);
+  --border2: rgba(255,255,255,0.12);
+  --accent: #3b82f6;
+  --accent2: #6366f1;
+  --green: #22c55e;
+  --yellow: #eab308;
+  --red: #ef4444;
+  --orange: #f97316;
+  --text: #e2e8f0;
+  --text2: #94a3b8;
+  --text3: #64748b;
+  --radius: 10px;
+  --shadow: 0 4px 24px rgba(0,0,0,0.4);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; overflow-x: hidden; }
+
+/* ── scrollbar ── */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: var(--bg2); }
+::-webkit-scrollbar-thumb { background: var(--bg3); border-radius: 3px; }
+
+/* ── header ── */
+.app-header {
+  background: linear-gradient(135deg, #1e2535 0%, #161b27 100%);
+  border-bottom: 1px solid var(--border);
+  padding: 0 24px;
+  display: flex; align-items: center; justify-content: space-between;
+  height: 60px; position: sticky; top: 0; z-index: 100;
+  box-shadow: 0 2px 20px rgba(0,0,0,0.5);
+}
+.app-logo { display: flex; align-items: center; gap: 10px; }
+.app-logo svg { width: 28px; height: 28px; }
+.app-logo h1 { font-size: 16px; font-weight: 700; color: var(--text); letter-spacing: -0.3px; }
+.app-logo span { font-size: 10px; font-weight: 500; background: var(--accent); color: #fff; padding: 2px 7px; border-radius: 20px; margin-left: 4px; }
+.header-actions { display: flex; gap: 8px; align-items: center; }
+
+/* ── tabs ── */
+.tabs { display: flex; gap: 2px; background: var(--bg); padding: 12px 24px 0; border-bottom: 1px solid var(--border); }
+.tab { padding: 10px 20px; font-size: 13px; font-weight: 500; color: var(--text2); cursor: pointer; border-radius: var(--radius) var(--radius) 0 0; border: 1px solid transparent; border-bottom: none; transition: all 0.2s; }
+.tab:hover { color: var(--text); background: var(--bg2); }
+.tab.active { background: var(--bg2); color: var(--accent); border-color: var(--border); }
+
+/* ── layout ── */
+.page { display: none; padding: 20px 24px; }
+.page.active { display: block; }
+
+/* ── analytics cards ── */
+.kpi-row { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-bottom: 20px; }
+@media (max-width: 1200px) { .kpi-row { grid-template-columns: repeat(3, 1fr); } }
+@media (max-width: 700px) { .kpi-row { grid-template-columns: 1fr 1fr; } }
+
+.kpi-card {
+  background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 16px; display: flex; flex-direction: column; gap: 6px; position: relative; overflow: hidden;
+}
+.kpi-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; border-radius: var(--radius) var(--radius) 0 0; }
+.kpi-card.blue::before { background: linear-gradient(90deg, var(--accent), var(--accent2)); }
+.kpi-card.green::before { background: linear-gradient(90deg, #22c55e, #16a34a); }
+.kpi-card.yellow::before { background: linear-gradient(90deg, #eab308, #ca8a04); }
+.kpi-card.red::before { background: linear-gradient(90deg, #ef4444, #dc2626); }
+.kpi-card.purple::before { background: linear-gradient(90deg, #a855f7, #9333ea); }
+
+.kpi-label { font-size: 11px; font-weight: 500; color: var(--text3); text-transform: uppercase; letter-spacing: 0.5px; }
+.kpi-val { font-size: 28px; font-weight: 700; color: var(--text); line-height: 1; }
+.kpi-sub { font-size: 11px; color: var(--text2); }
+.kpi-icon { position: absolute; right: 14px; top: 16px; font-size: 22px; opacity: 0.18; }
+
+/* ── charts row ── */
+.charts-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 20px; }
+@media (max-width: 1100px) { .charts-row { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 700px)  { .charts-row { grid-template-columns: 1fr; } }
+
+.chart-card { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; }
+.chart-card h4 { font-size: 13px; font-weight: 600; color: var(--text2); margin-bottom: 14px; text-transform: uppercase; letter-spacing: 0.4px; }
+
+/* mini bar chart */
+.mini-bars { display: flex; flex-direction: column; gap: 8px; }
+.mini-bar-row { display: flex; align-items: center; gap: 10px; }
+.mini-bar-label { font-size: 12px; color: var(--text2); width: 120px; flex-shrink: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mini-bar-track { flex: 1; height: 8px; background: var(--bg3); border-radius: 4px; overflow: hidden; }
+.mini-bar-fill { height: 100%; border-radius: 4px; transition: width 0.5s ease; }
+.mini-bar-val { font-size: 11px; color: var(--text3); width: 40px; text-align: right; }
+
+/* donut */
+.donut-wrap { position: relative; display: flex; justify-content: center; align-items: center; }
+.donut-center { position: absolute; text-align: center; }
+.donut-center-val { font-size: 22px; font-weight: 700; color: var(--text); }
+.donut-center-lbl { font-size: 11px; color: var(--text3); }
+.donut-legend { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.donut-leg-item { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--text2); }
+.donut-leg-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+
+/* timeline mini */
+.tl-mini { display: flex; flex-direction: column; gap: 6px; }
+.tl-mini-row { display: flex; align-items: center; gap: 8px; }
+.tl-mini-name { font-size: 11px; color: var(--text2); width: 90px; flex-shrink: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tl-mini-track { flex: 1; height: 14px; background: var(--bg3); border-radius: 3px; position: relative; overflow: hidden; }
+.tl-mini-bar { height: 100%; border-radius: 3px; position: absolute; display: flex; align-items: center; justify-content: center; }
+.tl-mini-bar span { font-size: 9px; color: #fff; font-weight: 600; padding: 0 3px; }
+.tl-mini-pct { font-size: 10px; color: var(--text3); width: 30px; text-align: right; }
+
+/* ── workers ── */
+.panel { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 16px; }
+.panel-header { padding: 14px 18px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+.panel-header h3 { font-size: 14px; font-weight: 600; color: var(--text); }
+.panel-body { padding: 16px 18px; }
+
+/* workers grid */
+.workers-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; }
+.worker-card {
+  background: var(--bg3); border: 1px solid var(--border); border-radius: 8px;
+  padding: 12px 14px; display: flex; align-items: center; gap: 10px; position: relative;
+  transition: border-color 0.2s;
+}
+.worker-card:hover { border-color: var(--border2); }
+.worker-avatar {
+  width: 36px; height: 36px; border-radius: 50%; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 13px; font-weight: 700; color: #fff;
+}
+.worker-info { flex: 1; min-width: 0; }
+.worker-name { font-size: 13px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.worker-role { font-size: 11px; color: var(--text3); margin-top: 1px; }
+.worker-tasks { font-size: 10px; color: var(--accent); margin-top: 2px; }
+.worker-del { position: absolute; top: 6px; right: 8px; background: none; border: none; color: var(--text3); cursor: pointer; font-size: 14px; opacity: 0; transition: opacity 0.2s; padding: 2px; }
+.worker-card:hover .worker-del { opacity: 1; }
+.worker-del:hover { color: var(--red); }
+
+/* ── tasks layout ── */
+.tasks-layout { display: grid; grid-template-columns: 380px 1fr; gap: 16px; }
+@media (max-width: 1000px) { .tasks-layout { grid-template-columns: 1fr; } }
+
+/* form */
+.form-group { margin-bottom: 14px; }
+.form-label { font-size: 11px; font-weight: 500; color: var(--text2); margin-bottom: 5px; display: block; text-transform: uppercase; letter-spacing: 0.4px; }
+.form-input, .form-select {
+  width: 100%; padding: 9px 12px; font-size: 13px;
+  background: var(--bg3); border: 1px solid var(--border2);
+  border-radius: 8px; color: var(--text); outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  font-family: 'Inter', sans-serif;
+}
+.form-input:focus, .form-select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(59,130,246,0.15); }
+.form-input::placeholder { color: var(--text3); }
+.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.form-row3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+
+/* checklist */
+.checklist-box { background: var(--bg3); border: 1px solid var(--border); border-radius: 8px; max-height: 130px; overflow-y: auto; }
+.check-item { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-bottom: 1px solid var(--border); cursor: pointer; transition: background 0.15s; }
+.check-item:last-child { border-bottom: none; }
+.check-item:hover { background: rgba(255,255,255,0.03); }
+.check-item input[type=checkbox] { width: 14px; height: 14px; accent-color: var(--accent); flex-shrink: 0; }
+.check-item-name { font-size: 12px; color: var(--text); }
+.check-item-role { font-size: 10px; color: var(--text3); margin-left: auto; }
+
+/* buttons */
+.btn { padding: 9px 16px; font-size: 13px; font-weight: 500; border-radius: 8px; border: none; cursor: pointer; transition: all 0.2s; font-family: 'Inter', sans-serif; display: inline-flex; align-items: center; gap: 6px; }
+.btn-primary { background: var(--accent); color: #fff; }
+.btn-primary:hover { background: #2563eb; }
+.btn-secondary { background: var(--bg3); color: var(--text); border: 1px solid var(--border2); }
+.btn-secondary:hover { background: rgba(255,255,255,0.06); }
+.btn-danger { background: rgba(239,68,68,0.1); color: var(--red); border: 1px solid rgba(239,68,68,0.2); }
+.btn-danger:hover { background: rgba(239,68,68,0.2); }
+.btn-sm { padding: 5px 10px; font-size: 11px; border-radius: 6px; }
+.btn-green { background: rgba(34,197,94,0.15); color: var(--green); border: 1px solid rgba(34,197,94,0.2); }
+.btn-green:hover { background: rgba(34,197,94,0.25); }
+.btn-row { display: flex; gap: 8px; flex-wrap: wrap; }
+
+/* table */
+.task-table-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+th { padding: 10px 12px; text-align: left; font-size: 11px; font-weight: 600; color: var(--text3); text-transform: uppercase; letter-spacing: 0.4px; background: var(--bg3); border-bottom: 1px solid var(--border); white-space: nowrap; }
+td { padding: 10px 12px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+tr:last-child td { border-bottom: none; }
+tr:hover td { background: rgba(255,255,255,0.015); }
+
+/* status badge */
+.badge { display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; border-radius: 20px; font-size: 11px; font-weight: 500; white-space: nowrap; }
+.badge-blue   { background: rgba(59,130,246,0.15);  color: #60a5fa; }
+.badge-yellow { background: rgba(234,179,8,0.15);   color: #fbbf24; }
+.badge-green  { background: rgba(34,197,94,0.15);   color: #4ade80; }
+.badge-red    { background: rgba(239,68,68,0.15);   color: #f87171; }
+.badge-gray   { background: rgba(100,116,139,0.2);  color: #94a3b8; }
+.badge-orange { background: rgba(249,115,22,0.15);  color: #fb923c; }
+
+/* priority dot */
+.prio { width: 8px; height: 8px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
+.prio-high   { background: var(--red); box-shadow: 0 0 6px rgba(239,68,68,0.5); }
+.prio-medium { background: var(--yellow); }
+.prio-low    { background: var(--green); }
+
+/* progress bar in table */
+.prog-bar { height: 5px; background: var(--bg3); border-radius: 3px; overflow: hidden; width: 80px; }
+.prog-fill { height: 100%; border-radius: 3px; }
+
+/* ── custom gantt ── */
+#gantt-container { overflow-x: auto; background: var(--bg2); }
+.g-wrap { min-width: 600px; }
+.g-header-row { display: flex; background: var(--bg3); border-bottom: 2px solid var(--border2); position: sticky; top: 0; z-index: 10; }
+.g-name-col { width: 200px; flex-shrink: 0; padding: 8px 12px; font-size: 10px; font-weight: 600; color: var(--text3); text-transform: uppercase; letter-spacing:.5px; border-right: 1px solid var(--border); }
+.g-timeline-header { flex: 1; overflow: hidden; position: relative; }
+.g-months { display: flex; height: 22px; border-bottom: 1px solid var(--border); }
+.g-month { border-right: 1px solid var(--border); display: flex; align-items: center; padding: 0 8px; font-size: 11px; font-weight: 600; color: var(--text2); flex-shrink: 0; white-space: nowrap; overflow: hidden; }
+.g-days { display: flex; height: 24px; }
+.g-day { border-right: 1px solid rgba(255,255,255,0.04); display: flex; align-items: center; justify-content: center; font-size: 9px; color: var(--text3); flex-shrink: 0; }
+.g-day.is-today { background: rgba(59,130,246,0.2); color: #60a5fa; font-weight: 700; }
+.g-day.is-weekend { background: rgba(255,255,255,0.015); }
+.g-body-row { display: flex; border-bottom: 1px solid var(--border); min-height: 42px; }
+.g-body-row:hover { background: rgba(255,255,255,0.018); }
+.g-row-label { width: 200px; flex-shrink: 0; border-right: 1px solid var(--border); padding: 6px 10px; display: flex; flex-direction: column; justify-content: center; gap: 1px; }
+.g-row-name { font-size: 12px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.g-row-meta { font-size: 10px; color: var(--text3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.g-track { flex: 1; position: relative; display: flex; align-items: center; }
+.g-grid-bg { position: absolute; inset: 0; display: flex; pointer-events: none; }
+.g-grid-day { border-right: 1px solid rgba(255,255,255,0.03); flex-shrink: 0; }
+.g-grid-day.is-today { background: rgba(59,130,246,0.08); border-right-color: rgba(59,130,246,0.3); }
+.g-grid-day.is-weekend { background: rgba(255,255,255,0.01); }
+.g-bar { position: absolute; height: 24px; border-radius: 5px; cursor: pointer; transition: filter .15s, height .15s; display: flex; align-items: center; overflow: hidden; }
+.g-bar:hover { filter: brightness(1.25); height: 28px; }
+.g-bar-bg { position: absolute; inset: 0; border-radius: 5px; }
+.g-bar-prog { position: absolute; top: 0; left: 0; height: 100%; background: rgba(0,0,0,0.25); border-radius: 5px 0 0 5px; pointer-events: none; }
+.g-bar-text { position: relative; z-index: 2; padding: 0 7px; font-size: 10px; font-weight: 600; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-shadow: 0 1px 3px rgba(0,0,0,.7); pointer-events: none; }
+.g-today-line { position: absolute; top: 0; bottom: 0; width: 2px; background: rgba(59,130,246,0.5); pointer-events: none; z-index: 5; }
+.g-tooltip { position: fixed; background: #1e2535; border: 1px solid rgba(255,255,255,.15); border-radius: 9px; padding: 10px 13px; font-size: 12px; color: #e2e8f0; z-index: 9999; pointer-events: none; box-shadow: 0 8px 30px rgba(0,0,0,.6); max-width: 250px; line-height: 1.6; }
+
+/* search + filter row */
+.filter-row { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; align-items: center; }
+.filter-row .form-input { width: auto; flex: 1; min-width: 180px; }
+.filter-row .form-select { width: auto; }
+
+/* hint text */
+.hint { font-size: 11px; color: var(--text3); margin-top: 5px; line-height: 1.5; }
+
+/* worker add row */
+.add-worker-row { display: flex; gap: 8px; margin-bottom: 14px; }
+.add-worker-row .form-input { flex: 1; }
+.add-worker-row .form-select { width: 140px; }
+
+/* stats pills */
+.stats-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+.stat-pill { background: var(--bg3); border: 1px solid var(--border); border-radius: 20px; padding: 5px 12px; font-size: 12px; color: var(--text2); }
+.stat-pill b { color: var(--text); }
+
+/* empty state */
+.empty { text-align: center; padding: 40px 20px; color: var(--text3); }
+.empty .icon { font-size: 36px; margin-bottom: 10px; opacity: 0.4; }
+.empty p { font-size: 13px; }
+
+/* gantt topbar */
+.gantt-bar2 { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; padding: 14px 18px; border-bottom: 1px solid var(--border); }
+.gantt-bar2 label { font-size: 12px; color: var(--text2); display: flex; align-items: center; gap: 6px; }
+
+/* modal */
+.modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 999; align-items: center; justify-content: center; }
+.modal-overlay.open { display: flex; }
+.modal { background: var(--bg2); border: 1px solid var(--border2); border-radius: 14px; padding: 24px; width: 500px; max-width: 95vw; box-shadow: 0 20px 60px rgba(0,0,0,0.6); max-height: 90vh; overflow-y: auto; }
+.modal h3 { font-size: 16px; font-weight: 700; margin-bottom: 18px; color: var(--text); }
+.modal-footer { display: flex; gap: 10px; justify-content: flex-end; margin-top: 18px; }
+
+/* dep select */
+.dep-list { display: flex; flex-direction: column; gap: 4px; max-height: 90px; overflow-y: auto; background: var(--bg3); border: 1px solid var(--border); border-radius: 8px; padding: 6px; }
+.dep-item { display: flex; align-items: center; gap: 8px; padding: 4px 6px; border-radius: 5px; cursor: pointer; font-size: 12px; color: var(--text2); }
+.dep-item:hover { background: rgba(255,255,255,0.04); }
+.dep-item input { accent-color: var(--accent2); }
+
+/* notification */
+.notif { position: fixed; bottom: 20px; right: 20px; background: var(--bg2); border: 1px solid var(--green); border-radius: 10px; padding: 12px 18px; font-size: 13px; color: var(--text); z-index: 9999; box-shadow: var(--shadow); animation: slideIn 0.3s ease; display: flex; align-items: center; gap: 8px; }
+@keyframes slideIn { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+/* load bar */
+.load-bar-wrap { margin-bottom: 6px; }
+.load-bar-label { display: flex; justify-content: space-between; font-size: 11px; color: var(--text2); margin-bottom: 3px; }
+.load-bar { height: 6px; background: var(--bg3); border-radius: 3px; overflow: hidden; }
+.load-bar-fill { height: 100%; border-radius: 3px; transition: width 0.4s; }
+
+hr.divider { border: none; border-top: 1px solid var(--border); margin: 14px 0; }
+
+.dep-badges { display: flex; flex-wrap: wrap; gap: 4px; }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header class="app-header">
+  <div class="app-logo">
+    <svg viewBox="0 0 28 28" fill="none"><rect width="28" height="28" rx="6" fill="#3b82f6" opacity=".15"/><path d="M6 14h4l3-7 4 14 3-9 2 2h4" stroke="#3b82f6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    <h1>Планировщик сборки <span>PRO</span></h1>
+  </div>
+  <div class="header-actions">
+    <button class="btn btn-secondary btn-sm" onclick="exportExcel()">📊 Excel</button>
+    <button class="btn btn-secondary btn-sm" onclick="exportJSON()">💾 JSON</button>
+    <button class="btn btn-secondary btn-sm" onclick="importJSONFile()">📂 Импорт</button>
+    <button class="btn btn-secondary btn-sm" onclick="saveLS()">🔒 Сохранить</button>
+  </div>
+</header>
+
+<!-- TABS -->
+<div class="tabs">
+  <div class="tab active" onclick="switchTab('analytics')">📊 Аналитика</div>
+  <div class="tab" onclick="switchTab('tasks')">📋 Задачи</div>
+  <div class="tab" onclick="switchTab('gantt')">📅 Гант</div>
+  <div class="tab" onclick="switchTab('workers')">👷 Сотрудники</div>
+  <div class="tab" onclick="switchTab('settings')">⚙️ Настройки</div>
+</div>
+
+<!-- ══════════════ ANALYTICS ══════════════ -->
+<div class="page active" id="page-analytics">
+  <div class="kpi-row">
+    <div class="kpi-card blue"><div class="kpi-icon">📋</div><div class="kpi-label">Всего задач</div><div class="kpi-val" id="kpi-total">0</div><div class="kpi-sub">в проекте</div></div>
+    <div class="kpi-card green"><div class="kpi-icon">✅</div><div class="kpi-label">Выполнено</div><div class="kpi-val" id="kpi-done">0</div><div class="kpi-sub" id="kpi-done-pct">0%</div></div>
+    <div class="kpi-card yellow"><div class="kpi-icon">⚡</div><div class="kpi-label">В работе</div><div class="kpi-val" id="kpi-inprog">0</div><div class="kpi-sub">задач</div></div>
+    <div class="kpi-card red"><div class="kpi-icon">🔥</div><div class="kpi-label">Просрочено</div><div class="kpi-val" id="kpi-overdue">0</div><div class="kpi-sub">задач</div></div>
+    <div class="kpi-card purple"><div class="kpi-icon">⏱</div><div class="kpi-label">Всего нормо-ч</div><div class="kpi-val" id="kpi-hours">0</div><div class="kpi-sub">плановых</div></div>
+  </div>
+
+  <div class="charts-row">
+    <div class="chart-card">
+      <h4>Нагрузка по сотрудникам</h4>
+      <div id="chart-workload" class="mini-bars"></div>
+    </div>
+    <div class="chart-card">
+      <h4>Статусы задач</h4>
+      <canvas id="donut-canvas" width="160" height="160" style="display:block;margin:0 auto;"></canvas>
+      <div class="donut-legend" id="donut-legend"></div>
+    </div>
+    <div class="chart-card">
+      <h4>Временная шкала (топ-8)</h4>
+      <div id="chart-timeline" class="tl-mini"></div>
+    </div>
+  </div>
+
+  <div class="charts-row" style="grid-template-columns:1fr 1fr;">
+    <div class="chart-card">
+      <h4>Задачи по приоритетам</h4>
+      <div id="chart-priority" class="mini-bars"></div>
+    </div>
+    <div class="chart-card">
+      <h4>Прогресс выполнения</h4>
+      <div id="chart-progress" class="mini-bars"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════ TASKS ══════════════ -->
+<div class="page" id="page-tasks">
+  <div class="tasks-layout">
+
+    <!-- Form -->
+    <div>
+      <div class="panel">
+        <div class="panel-header"><h3 id="form-title">➕ Новая задача</h3></div>
+        <div class="panel-body">
+          <div class="form-row">
+            <div class="form-group"><label class="form-label">Проект</label><input class="form-input" id="f-project" placeholder="Газетка / Raben…"/></div>
+            <div class="form-group"><label class="form-label">Узел</label><input class="form-input" id="f-node" placeholder="Каретка, Дивертор…"/></div>
+          </div>
+          <div class="form-row3">
+            <div class="form-group"><label class="form-label">Кол-во узлов</label><input class="form-input" id="f-qty" type="number" min="1" value="1"/></div>
+            <div class="form-group"><label class="form-label">Н/ч на узел</label><input class="form-input" id="f-norm" type="number" min="0" step="0.5" placeholder="12.5"/></div>
+            <div class="form-group"><label class="form-label">Старт</label><input class="form-input" id="f-start" type="date"/></div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Приоритет</label>
+              <select class="form-select" id="f-priority">
+                <option value="high">🔴 Высокий</option>
+                <option value="medium" selected>🟡 Средний</option>
+                <option value="low">🟢 Низкий</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Статус</label>
+              <select class="form-select" id="f-status">
+                <option value="pending">⏳ Ожидает</option>
+                <option value="inprogress">⚡ В работе</option>
+                <option value="done">✅ Выполнено</option>
+                <option value="hold">⏸ Пауза</option>
+                <option value="cancelled">❌ Отменено</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Прогресс: <span id="prog-val">0</span>%</label>
+            <input type="range" id="f-progress" min="0" max="100" value="0" style="width:100%;accent-color:var(--accent);" oninput="document.getElementById('prog-val').textContent=this.value">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Зависит от (задачи)</label>
+            <div class="dep-list" id="dep-list"></div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Кто собирает</label>
+            <div class="checklist-box" id="f-checklist"></div>
+            <div class="hint">Длительность = ⌈(кол-во × н/ч) ÷ (люди × часов/смена)⌉</div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Комментарий</label>
+            <input class="form-input" id="f-comment" placeholder="Заметки по задаче…"/>
+          </div>
+          <div class="btn-row">
+            <button class="btn btn-primary" id="btn-save-task">➕ Добавить</button>
+            <button class="btn btn-secondary" id="btn-cancel-edit" style="display:none" onclick="cancelEdit()">Отмена</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Table -->
+    <div>
+      <div class="filter-row">
+        <input class="form-input" id="search" placeholder="🔍 Поиск…" oninput="renderTable()">
+        <select class="form-select" id="filter-status" onchange="renderTable()" style="width:160px">
+          <option value="">Все статусы</option>
+          <option value="pending">Ожидает</option>
+          <option value="inprogress">В работе</option>
+          <option value="done">Выполнено</option>
+          <option value="hold">Пауза</option>
+          <option value="cancelled">Отменено</option>
+        </select>
+        <select class="form-select" id="filter-prio" onchange="renderTable()" style="width:150px">
+          <option value="">Все приоритеты</option>
+          <option value="high">Высокий</option>
+          <option value="medium">Средний</option>
+          <option value="low">Низкий</option>
+        </select>
+        <select class="form-select" id="filter-sort" onchange="renderTable()" style="width:170px">
+          <option value="created">По дате добавления</option>
+          <option value="start">По дате старта</option>
+          <option value="prio">По приоритету</option>
+          <option value="progress">По прогрессу</option>
+        </select>
+      </div>
+
+      <div class="stats-row" id="stats-row"></div>
+
+      <div class="panel">
+        <div class="task-table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Приор.</th><th>ID</th><th>Проект / Узел</th><th>Шт</th><th>Н/ч</th>
+                <th>Люди</th><th>Сроки</th><th>Статус</th><th>Прогресс</th><th>Действия</th>
+              </tr>
+            </thead>
+            <tbody id="task-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════ GANTT ══════════════ -->
+<div class="page" id="page-gantt">
+  <div class="panel">
+    <div class="gantt-bar2">
+      <label>Масштаб:
+        <select class="form-select" id="viewMode" onchange="renderGantt()" style="width:130px">
+          <option value="week" selected>Неделя</option>
+          <option value="month">Месяц</option>
+          <option value="day">День</option>
+        </select>
+      </label>
+      <label>Фильтр:
+        <select class="form-select" id="gantt-filter" onchange="renderGantt()" style="width:160px">
+          <option value="">Все задачи</option>
+          <option value="inprogress">В работе</option>
+          <option value="pending">Ожидает</option>
+          <option value="done">Выполнено</option>
+        </select>
+      </label>
+      <span style="font-size:12px;color:var(--text3);">Перетаскивай полосы · Двойной клик — детали · Прогресс — правый край</span>
+    </div>
+    <div id="gantt-container" style="padding:10px 0;min-height:200px;"></div>
+  </div>
+</div>
+
+<!-- ══════════════ WORKERS ══════════════ -->
+<div class="page" id="page-workers">
+  <div class="panel" style="margin-bottom:16px">
+    <div class="panel-header"><h3>Добавить сотрудника</h3></div>
+    <div class="panel-body">
+      <div class="add-worker-row">
+        <input class="form-input" id="w-name" placeholder="Имя сотрудника"/>
+        <input class="form-input" id="w-role" placeholder="Должность" style="width:180px"/>
+        <select class="form-select" id="w-color" style="width:120px">
+          <option value="#3b82f6">🔵 Синий</option>
+          <option value="#22c55e">🟢 Зелёный</option>
+          <option value="#f97316">🟠 Оранжевый</option>
+          <option value="#a855f7">🟣 Фиолетовый</option>
+          <option value="#ef4444">🔴 Красный</option>
+          <option value="#eab308">🟡 Жёлтый</option>
+          <option value="#06b6d4">🩵 Голубой</option>
+          <option value="#ec4899">🩷 Розовый</option>
+        </select>
+        <button class="btn btn-primary" onclick="addWorker()">Добавить</button>
+      </div>
+      <div class="workers-grid" id="workers-grid"></div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-header"><h3>📊 Загрузка сотрудников</h3></div>
+    <div class="panel-body" id="workers-load"></div>
+  </div>
+</div>
+
+<!-- ══════════════ SETTINGS ══════════════ -->
+<div class="page" id="page-settings">
+  <div style="max-width:480px;">
+    <div class="panel">
+      <div class="panel-header"><h3>⚙️ Общие настройки</h3></div>
+      <div class="panel-body">
+        <div class="form-group"><label class="form-label">Часов в рабочей смене</label><input class="form-input" id="s-hpd" type="number" min="1" max="24" value="8" oninput="saveSettings()"/></div>
+        <div class="form-group"><label class="form-label">Стартовая дата по умолчанию</label><input class="form-input" id="s-defstart" type="date" oninput="saveSettings()"/></div>
+        <div class="form-group"><label class="form-label">Название компании / проекта</label><input class="form-input" id="s-company" placeholder="ООО Ромашка" oninput="saveSettings()"/></div>
+        <hr class="divider">
+        <div class="btn-row">
+          <button class="btn btn-secondary" onclick="saveLS()">🔒 Сохранить в браузер</button>
+          <button class="btn btn-secondary" onclick="loadLS()">📂 Загрузить из браузера</button>
+          <button class="btn btn-danger" onclick="clearAll()">🗑 Очистить всё</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- EDIT MODAL -->
+<div class="modal-overlay" id="edit-modal">
+  <div class="modal">
+    <h3>✏️ Редактировать задачу</h3>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">Проект</label><input class="form-input" id="m-project"/></div>
+      <div class="form-group"><label class="form-label">Узел</label><input class="form-input" id="m-node"/></div>
+    </div>
+    <div class="form-row3">
+      <div class="form-group"><label class="form-label">Кол-во</label><input class="form-input" id="m-qty" type="number" min="1"/></div>
+      <div class="form-group"><label class="form-label">Н/ч на узел</label><input class="form-input" id="m-norm" type="number" step="0.5"/></div>
+      <div class="form-group"><label class="form-label">Старт</label><input class="form-input" id="m-start" type="date"/></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Приоритет</label>
+        <select class="form-select" id="m-priority">
+          <option value="high">🔴 Высокий</option><option value="medium">🟡 Средний</option><option value="low">🟢 Низкий</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Статус</label>
+        <select class="form-select" id="m-status">
+          <option value="pending">⏳ Ожидает</option><option value="inprogress">⚡ В работе</option>
+          <option value="done">✅ Выполнено</option><option value="hold">⏸ Пауза</option><option value="cancelled">❌ Отменено</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Прогресс: <span id="m-prog-val">0</span>%</label>
+      <input type="range" id="m-progress" min="0" max="100" value="0" style="width:100%;accent-color:var(--accent);" oninput="document.getElementById('m-prog-val').textContent=this.value">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Сотрудники</label>
+      <div class="checklist-box" id="m-checklist"></div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Комментарий</label>
+      <input class="form-input" id="m-comment"/>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal()">Отмена</button>
+      <button class="btn btn-primary" onclick="saveModal()">💾 Сохранить</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════
+//  STATE
+// ═══════════════════════════════════════
+const LS_KEY = 'asm_pro_v1';
+
+let state = {
+  settings: { hoursPerDay: 8, defaultStart: todayISO(), company: '' },
+  workers: [
+    { id:'w1', name:'Миша',  role:'Сборщик',    color:'#3b82f6' },
+    { id:'w2', name:'Саша',  role:'Ст.сборщик', color:'#22c55e' },
+    { id:'w3', name:'Игорь', role:'Техник',     color:'#f97316' },
+  ],
+  tasks: []
+};
+
+// seed demo task
+state.tasks.push(makeTask({
+  project:'Газетка', node:'Сборка дивертора',
+  qty:2, norm:12, start:todayISO(),
+  priority:'high', status:'inprogress', progress:35,
+  workerIds:['w1','w2'], comment:'Демо задача'
+}));
+state.tasks.push(makeTask({
+  project:'Raben', node:'Ролганг транспортный',
+  qty:5, norm:8, start:addDays(todayISO(),3),
+  priority:'medium', status:'pending', progress:0,
+  workerIds:['w3'], comment:''
+}));
+
+// ═══════════════════════════════════════
+//  HELPERS
+// ═══════════════════════════════════════
+function todayISO(){ return new Date().toISOString().slice(0,10); }
+function addDays(iso, d){ const dt=new Date(iso+'T00:00:00'); dt.setDate(dt.getDate()+d); return dt.toISOString().slice(0,10); }
+function diffDays(s,e){ return Math.max(1,Math.round((new Date(e+'T00:00:00')-new Date(s+'T00:00:00'))/(864e5))); }
+function calcDays(nh,ppl,hpd){ if(!nh||!ppl) return 1; return Math.max(1,Math.ceil(nh/(ppl*hpd))); }
+function uid(){ return 'T'+Math.random().toString(36).slice(2,7).toUpperCase(); }
+function wuid(){ return 'w'+Math.random().toString(36).slice(2,7); }
+function esc(s){ return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function makeTask({project,node,qty,norm,start,priority,status,progress,workerIds,comment,deps}){
+  const totalNH = (qty||1)*(norm||0);
+  const hpd = state.settings.hoursPerDay||8;
+  const days = calcDays(totalNH,(workerIds||[]).length,hpd);
+  return {
+    id: uid(),
+    project:project||'', node:node||'',
+    qty:qty||1, norm:norm||0, totalNH,
+    start:start||todayISO(),
+    end:addDays(start||todayISO(),days),
+    priority:priority||'medium',
+    status:status||'pending',
+    progress:progress||0,
+    workerIds:workerIds||[],
+    comment:comment||'',
+    deps:deps||[],
+    createdAt:Date.now()
+  };
+}
+
+function recalcEnd(t){
+  const hpd=state.settings.hoursPerDay||8;
+  const days=calcDays(t.totalNH,t.workerIds.length,hpd);
+  t.end=addDays(t.start,days);
+}
+
+// ═══════════════════════════════════════
+//  PERSIST
+// ═══════════════════════════════════════
+function saveLS(){
+  try{ localStorage.setItem(LS_KEY,JSON.stringify(state)); notify('✅ Сохранено'); }
+  catch(e){ notify('❌ Ошибка сохранения','red'); }
+}
+function loadLS(){
+  const raw=localStorage.getItem(LS_KEY);
+  if(!raw){ notify('⚠️ Нет сохранённых данных','orange'); return; }
+  try{ state=JSON.parse(raw); applySettings(); renderAll(); notify('📂 Загружено'); }
+  catch(e){ notify('❌ Ошибка загрузки','red'); }
+}
+function clearAll(){
+  if(!confirm('Очистить все данные?')) return;
+  localStorage.removeItem(LS_KEY);
+  state={settings:{hoursPerDay:8,defaultStart:todayISO(),company:''},workers:[],tasks:[]};
+  applySettings(); renderAll();
+}
+
+// ═══════════════════════════════════════
+//  TABS
+// ═══════════════════════════════════════
+function switchTab(id){
+  document.querySelectorAll('.tab').forEach((t,i)=>t.classList.toggle('active',['analytics','tasks','gantt','workers','settings'][i]===id));
+  document.querySelectorAll('.page').forEach(p=>p.classList.toggle('active',p.id==='page-'+id));
+  if(id==='gantt') setTimeout(renderGantt,50);
+  if(id==='analytics') renderAnalytics();
+  if(id==='workers') renderWorkers();
+}
+
+// ═══════════════════════════════════════
+//  SETTINGS
+// ═══════════════════════════════════════
+function saveSettings(){
+  state.settings.hoursPerDay=Math.max(1,+document.getElementById('s-hpd').value||8);
+  state.settings.defaultStart=document.getElementById('s-defstart').value||todayISO();
+  state.settings.company=document.getElementById('s-company').value||'';
+}
+function applySettings(){
+  document.getElementById('s-hpd').value=state.settings.hoursPerDay||8;
+  document.getElementById('s-defstart').value=state.settings.defaultStart||todayISO();
+  document.getElementById('s-company').value=state.settings.company||'';
+  document.getElementById('f-start').value=state.settings.defaultStart||todayISO();
+}
+
+// ═══════════════════════════════════════
+//  WORKERS
+// ═══════════════════════════════════════
+function addWorker(){
+  const name=document.getElementById('w-name').value.trim();
+  if(!name) return;
+  if(state.workers.find(w=>w.name===name)){ notify('⚠️ Уже есть','orange'); return; }
+  state.workers.push({ id:wuid(), name, role:document.getElementById('w-role').value.trim()||'Сборщик', color:document.getElementById('w-color').value });
+  document.getElementById('w-name').value=''; document.getElementById('w-role').value='';
+  renderWorkers(); renderFormChecklist(); renderDepList(); saveLS();
+  notify('👷 Добавлен: '+name);
+}
+window.deleteWorker=function(id){
+  const w=state.workers.find(x=>x.id===id);
+  if(w && !confirm('Удалить '+w.name+'?')) return;
+  state.workers=state.workers.filter(x=>x.id!==id);
+  state.tasks.forEach(t=>{ t.workerIds=t.workerIds.filter(x=>x!==id); recalcEnd(t); });
+  renderWorkers(); renderFormChecklist(); renderAll(); saveLS();
+};
+
+function renderWorkers(){
+  const grid=document.getElementById('workers-grid');
+  if(!state.workers.length){ grid.innerHTML='<div class="hint" style="padding:10px">Пока нет сотрудников</div>'; return; }
+  grid.innerHTML=state.workers.map(w=>{
+    const taskCount=state.tasks.filter(t=>t.workerIds.includes(w.id)).length;
+    const totalH=state.tasks.filter(t=>t.workerIds.includes(w.id)).reduce((s,t)=>s+(t.totalNH/(t.workerIds.length||1)),0);
+    return `<div class="worker-card">
+      <div class="worker-avatar" style="background:${w.color}22;border:2px solid ${w.color}40;color:${w.color}">${w.name[0].toUpperCase()}</div>
+      <div class="worker-info">
+        <div class="worker-name">${esc(w.name)}</div>
+        <div class="worker-role">${esc(w.role)}</div>
+        <div class="worker-tasks">${taskCount} задач · ${totalH.toFixed(0)} н/ч</div>
+      </div>
+      <button class="worker-del" onclick="deleteWorker('${w.id}')">✕</button>
+    </div>`;
+  }).join('');
+
+  // load chart
+  const loadDiv=document.getElementById('workers-load');
+  const maxH=Math.max(1,...state.workers.map(w=>state.tasks.filter(t=>t.workerIds.includes(w.id)).reduce((s,t)=>s+t.totalNH/(t.workerIds.length||1),0)));
+  loadDiv.innerHTML=state.workers.map(w=>{
+    const h=state.tasks.filter(t=>t.workerIds.includes(w.id)).reduce((s,t)=>s+t.totalNH/(t.workerIds.length||1),0);
+    const pct=maxH>0?(h/maxH*100):0;
+    const color = pct>80?'var(--red)':pct>50?'var(--yellow)':'var(--green)';
+    return `<div class="load-bar-wrap">
+      <div class="load-bar-label"><span>${esc(w.name)} <small style="color:var(--text3)">${esc(w.role)}</small></span><span style="color:var(--text2)">${h.toFixed(1)} н/ч</span></div>
+      <div class="load-bar"><div class="load-bar-fill" style="width:${pct.toFixed(1)}%;background:${color}"></div></div>
+    </div>`;
+  }).join('');
+}
+
+// ═══════════════════════════════════════
+//  FORM CHECKLISTS
+// ═══════════════════════════════════════
+function renderFormChecklist(selected=[]){
+  const el=document.getElementById('f-checklist');
+  if(!state.workers.length){ el.innerHTML='<div class="hint" style="padding:8px">Добавьте сотрудников во вкладке "Сотрудники"</div>'; return; }
+  el.innerHTML=state.workers.map(w=>`
+    <label class="check-item">
+      <input type="checkbox" value="${w.id}" ${selected.includes(w.id)?'checked':''}>
+      <span class="check-item-name">${esc(w.name)}</span>
+      <span class="check-item-role">${esc(w.role)}</span>
+    </label>`).join('');
+}
+function renderModalChecklist(selected=[]){
+  const el=document.getElementById('m-checklist');
+  el.innerHTML=state.workers.map(w=>`
+    <label class="check-item">
+      <input type="checkbox" value="${w.id}" ${selected.includes(w.id)?'checked':''}>
+      <span class="check-item-name">${esc(w.name)}</span>
+      <span class="check-item-role">${esc(w.role)}</span>
+    </label>`).join('');
+}
+function getChecked(elId){
+  return Array.from(document.querySelectorAll(`#${elId} input[type=checkbox]:checked`)).map(x=>x.value);
+}
+
+function renderDepList(excludeId=''){
+  const el=document.getElementById('dep-list');
+  const deps=state.tasks.filter(t=>t.id!==excludeId);
+  if(!deps.length){ el.innerHTML='<div class="hint" style="padding:6px">Нет других задач</div>'; return; }
+  el.innerHTML=deps.map(t=>`
+    <label class="dep-item">
+      <input type="checkbox" value="${t.id}">
+      <span>${esc(t.project)} — ${esc(t.node)}</span>
+    </label>`).join('');
+}
+
+// ═══════════════════════════════════════
+//  TASK CRUD
+// ═══════════════════════════════════════
+let editId=null;
+
+document.getElementById('btn-save-task').addEventListener('click',()=>{
+  const hpd=state.settings.hoursPerDay||8;
+  const start=document.getElementById('f-start').value||todayISO();
+  const qty=Math.max(1,+document.getElementById('f-qty').value||1);
+  const norm=+document.getElementById('f-norm').value||0;
+  const workerIds=getChecked('f-checklist');
+  const totalNH=qty*norm;
+  const days=calcDays(totalNH,workerIds.length,hpd);
+  const deps=getChecked('dep-list');
+
+  const t={
+    id:uid(), project:document.getElementById('f-project').value.trim(),
+    node:document.getElementById('f-node').value.trim(),
+    qty, norm, totalNH,
+    start, end:addDays(start,days),
+    priority:document.getElementById('f-priority').value,
+    status:document.getElementById('f-status').value,
+    progress:+document.getElementById('f-progress').value,
+    workerIds, comment:document.getElementById('f-comment').value.trim(),
+    deps, createdAt:Date.now()
+  };
+
+  state.tasks.unshift(t);
+  resetForm();
+  renderAll(); saveLS();
+  notify('✅ Задача добавлена: '+t.node);
+});
+
+function resetForm(){
+  ['f-project','f-node','f-norm','f-comment'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('f-qty').value='1';
+  document.getElementById('f-progress').value='0';
+  document.getElementById('prog-val').textContent='0';
+  document.getElementById('f-priority').value='medium';
+  document.getElementById('f-status').value='pending';
+  document.getElementById('f-start').value=state.settings.defaultStart||todayISO();
+  renderFormChecklist(); renderDepList();
+  editId=null;
+}
+
+function cancelEdit(){ resetForm(); document.getElementById('btn-cancel-edit').style.display='none'; document.getElementById('form-title').textContent='➕ Новая задача'; }
+
+window.deleteTask=function(id){
+  if(!confirm('Удалить задачу?')) return;
+  state.tasks=state.tasks.filter(t=>t.id!==id);
+  renderAll(); saveLS(); notify('🗑 Задача удалена','orange');
+};
+
+window.editTask=function(id){
+  const t=state.tasks.find(x=>x.id===id); if(!t) return;
+  openModal(t);
+};
+
+window.changeStatus=function(id,val){
+  const t=state.tasks.find(x=>x.id===id); if(!t) return;
+  t.status=val; if(val==='done') t.progress=100;
+  renderAll(); saveLS();
+};
+
+// MODAL
+function openModal(t){
+  editId=t.id;
+  document.getElementById('m-project').value=t.project;
+  document.getElementById('m-node').value=t.node;
+  document.getElementById('m-qty').value=t.qty;
+  document.getElementById('m-norm').value=t.norm;
+  document.getElementById('m-start').value=t.start;
+  document.getElementById('m-priority').value=t.priority;
+  document.getElementById('m-status').value=t.status;
+  document.getElementById('m-progress').value=t.progress;
+  document.getElementById('m-prog-val').textContent=t.progress;
+  document.getElementById('m-comment').value=t.comment||'';
+  renderModalChecklist(t.workerIds);
+  document.getElementById('edit-modal').classList.add('open');
+}
+function closeModal(){ document.getElementById('edit-modal').classList.remove('open'); editId=null; }
+function saveModal(){
+  const t=state.tasks.find(x=>x.id===editId); if(!t) return;
+  t.project=document.getElementById('m-project').value.trim();
+  t.node=document.getElementById('m-node').value.trim();
+  t.qty=Math.max(1,+document.getElementById('m-qty').value||1);
+  t.norm=+document.getElementById('m-norm').value||0;
+  t.totalNH=t.qty*t.norm;
+  t.start=document.getElementById('m-start').value||todayISO();
+  t.priority=document.getElementById('m-priority').value;
+  t.status=document.getElementById('m-status').value;
+  t.progress=+document.getElementById('m-progress').value;
+  t.workerIds=getChecked('m-checklist');
+  t.comment=document.getElementById('m-comment').value.trim();
+  if(t.status==='done') t.progress=100;
+  recalcEnd(t);
+  closeModal(); renderAll(); saveLS();
+  notify('💾 Изменения сохранены');
+}
+
+// ═══════════════════════════════════════
+//  RENDER TABLE
+// ═══════════════════════════════════════
+const STATUS_CFG={
+  pending:   {label:'⏳ Ожидает',  cls:'badge-gray'},
+  inprogress:{label:'⚡ В работе', cls:'badge-blue'},
+  done:      {label:'✅ Готово',   cls:'badge-green'},
+  hold:      {label:'⏸ Пауза',    cls:'badge-yellow'},
+  cancelled: {label:'❌ Отменено', cls:'badge-red'},
+};
+const PRIO_CFG={high:'prio-high',medium:'prio-medium',low:'prio-low'};
+const PRIO_SORT={high:0,medium:1,low:2};
+
+function filteredTasks(){
+  const q=(document.getElementById('search')?.value||'').toLowerCase();
+  const fst=document.getElementById('filter-status')?.value||'';
+  const fp=document.getElementById('filter-prio')?.value||'';
+  const fs=document.getElementById('filter-sort')?.value||'created';
+
+  let list=[...state.tasks];
+  if(q) list=list.filter(t=>(t.project+t.node+t.id).toLowerCase().includes(q));
+  if(fst) list=list.filter(t=>t.status===fst);
+  if(fp) list=list.filter(t=>t.priority===fp);
+  if(fs==='start') list.sort((a,b)=>a.start.localeCompare(b.start));
+  else if(fs==='prio') list.sort((a,b)=>PRIO_SORT[a.priority]-PRIO_SORT[b.priority]);
+  else if(fs==='progress') list.sort((a,b)=>b.progress-a.progress);
+  else list.sort((a,b)=>b.createdAt-a.createdAt);
+  return list;
+}
+
+function renderTable(){
+  const tbody=document.getElementById('task-tbody');
+  const list=filteredTasks();
+  const today=todayISO();
+
+  // stats
+  const statsRow=document.getElementById('stats-row');
+  statsRow.innerHTML=`
+    <div class="stat-pill">Всего: <b>${state.tasks.length}</b></div>
+    <div class="stat-pill">Показано: <b>${list.length}</b></div>
+    <div class="stat-pill">Н/ч: <b>${state.tasks.reduce((s,t)=>s+t.totalNH,0).toFixed(0)}</b></div>
+    <div class="stat-pill">Сотрудников: <b>${state.workers.length}</b></div>
+  `;
+
+  if(!list.length){ tbody.innerHTML=`<tr><td colspan="10"><div class="empty"><div class="icon">📭</div><p>Нет задач</p></div></td></tr>`; return; }
+
+  tbody.innerHTML=list.map(t=>{
+    const sc=STATUS_CFG[t.status]||STATUS_CFG.pending;
+    const pc=PRIO_CFG[t.priority]||'prio-medium';
+    const workers=t.workerIds.map(id=>{const w=state.workers.find(x=>x.id===id);return w?`<span style="display:inline-block;width:20px;height:20px;border-radius:50%;background:${w.color}22;border:1px solid ${w.color}60;color:${w.color};font-size:9px;text-align:center;line-height:20px;font-weight:700" title="${esc(w.name)}">${w.name[0]}</span>`:''}).join('');
+    const overdue=t.status!=='done'&&t.status!=='cancelled'&&t.end<today;
+    const progColor=t.progress>=100?'var(--green)':t.progress>=50?'var(--accent)':'var(--yellow)';
+    const depBadges=(t.deps||[]).map(id=>{const dt=state.tasks.find(x=>x.id===id);return dt?`<span class="badge badge-gray" style="font-size:9px">${esc(dt.id)}</span>`:''}).join('');
+    return `<tr>
+      <td><span class="prio ${pc}"></span></td>
+      <td style="font-family:monospace;font-size:11px;color:var(--text3)">${t.id}</td>
+      <td>
+        <div style="font-weight:600;color:var(--text)">${esc(t.project)}</div>
+        <div style="font-size:12px;color:var(--text2)">${esc(t.node)}</div>
+        ${t.comment?`<div style="font-size:11px;color:var(--text3);margin-top:2px">${esc(t.comment)}</div>`:''}
+        ${depBadges?`<div style="margin-top:3px" class="dep-badges">${depBadges}</div>`:''}
+      </td>
+      <td>${t.qty}</td>
+      <td>${t.totalNH.toFixed(1)}</td>
+      <td>${workers||'—'}</td>
+      <td style="font-size:11px;white-space:nowrap">
+        <div>${t.start}</div>
+        <div style="color:${overdue?'var(--red)':'var(--text3)'}">${t.end} ${overdue?'⚠️':''}</div>
+        <div style="color:var(--text3)">${diffDays(t.start,t.end)} дн.</div>
+      </td>
+      <td>
+        <select class="form-select" style="padding:4px 6px;font-size:11px;width:auto" onchange="changeStatus('${t.id}',this.value)">
+          ${Object.entries(STATUS_CFG).map(([v,{label}])=>`<option value="${v}" ${t.status===v?'selected':''}>${label}</option>`).join('')}
+        </select>
+      </td>
+      <td>
+        <div class="prog-bar"><div class="prog-fill" style="width:${t.progress}%;background:${progColor}"></div></div>
+        <div style="font-size:10px;color:var(--text3);margin-top:2px">${t.progress}%</div>
+      </td>
+      <td>
+        <div class="btn-row">
+          <button class="btn btn-secondary btn-sm" onclick="editTask('${t.id}')">✏️</button>
+          <button class="btn btn-danger btn-sm" onclick="deleteTask('${t.id}')">🗑</button>
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+// ═══════════════════════════════════════
+//  GANTT
+// ═══════════════════════════════════════
+// ── BAR COLORS BY PRIORITY & STATUS ──
+const BAR_COLORS = {
+  high:   { bg:'#ef4444', light:'#fca5a5' },
+  medium: { bg:'#3b82f6', light:'#93c5fd' },
+  low:    { bg:'#22c55e', light:'#86efac' },
+};
+const STATUS_COLORS = { done:'#22c55e', cancelled:'#64748b', hold:'#eab308', inprogress:'#3b82f6', pending:'#6366f1' };
+
+function renderGantt(){
+  const container = document.getElementById('gantt-container');
+  const vm  = document.getElementById('viewMode').value;   // day / week / month
+  const gf  = document.getElementById('gantt-filter').value;
+
+  let list = [...state.tasks].sort((a,b)=>a.start.localeCompare(b.start));
+  if(gf) list = list.filter(t=>t.status===gf);
+  if(!list.length){
+    container.innerHTML='<div style="text-align:center;padding:60px 20px;color:var(--text3);font-size:13px;">📅 Нет задач для отображения</div>';
+    return;
+  }
+
+  // ── compute date range ──
+  const today = todayISO();
+  let minDate = list.reduce((m,t)=>t.start<m?t.start:m, list[0].start);
+  let maxDate = list.reduce((m,t)=>t.end>m?t.end:m, list[0].end);
+  // pad
+  minDate = addDays(minDate, -3);
+  maxDate = addDays(maxDate,  5);
+
+  // ── build day list ──
+  const days = [];
+  let cur = minDate;
+  while(cur <= maxDate){ days.push(cur); cur = addDays(cur,1); }
+
+  // ── cell width by view ──
+  const cellW = vm==='month' ? 22 : vm==='week' ? 34 : 50;
+  const totalW = days.length * cellW;
+
+  // ── month groups ──
+  const months = [];
+  days.forEach((d,i)=>{
+    const m = d.slice(0,7);
+    if(!months.length || months[months.length-1].key!==m)
+      months.push({key:m, label:new Date(d+'T12:00:00').toLocaleString('ru',{month:'long',year:'numeric'}), count:1, startIdx:i});
+    else months[months.length-1].count++;
+  });
+
+  const dayNames = ['Вс','Пн','Вт','Ср','Чт','Пт','Сб'];
+
+  // helper: pos from date string
+  function dateToX(iso){
+    const idx = days.indexOf(iso);
+    return idx>=0 ? idx*cellW : (iso<minDate?0:totalW);
+  }
+
+  // ── build HTML ──
+  // Header months
+  let monthCells = months.map(m=>
+    `<div class="g-month" style="width:${m.count*cellW}px">${m.label}</div>`
+  ).join('');
+
+  // Header days
+  let dayCells = days.map(d=>{
+    const dt = new Date(d+'T12:00:00');
+    const dow = dt.getDay();
+    const isWeekend = dow===0||dow===6;
+    const isTod = d===today;
+    const cls = (isTod?'is-today':'') + (isWeekend?' is-weekend':'');
+    const lbl = vm==='month' ? (dt.getDate()===1?dt.getDate():'') :
+                vm==='week'  ? (dow===1||dt.getDate()===1?dt.getDate():'') :
+                               dt.getDate();
+    return `<div class="g-day ${cls}" style="width:${cellW}px">${lbl}</div>`;
+  }).join('');
+
+  // Today line X
+  const todayX = dateToX(today) + cellW/2;
+
+  // Body rows
+  let bodyRows = list.map(t=>{
+    const workers = t.workerIds.map(id=>state.workers.find(x=>x.id===id)?.name||'?').join(', ');
+    const sc = STATUS_CFG[t.status]||STATUS_CFG.pending;
+    const bc = STATUS_COLORS[t.status]||'#6366f1';
+    const prio = BAR_COLORS[t.priority]||BAR_COLORS.medium;
+    const barColor = bc;
+
+    // clamp to visible range
+    const xs = Math.max(0, dateToX(t.start));
+    const xe = Math.min(totalW, dateToX(t.end)+cellW);
+    const bw = Math.max(cellW*0.8, xe-xs);
+    const progW = Math.round(bw * (t.progress||0)/100);
+
+    // grid bg days
+    let gridDays = days.map(d=>{
+      const dt=new Date(d+'T12:00:00'); const dow=dt.getDay();
+      const cls=(d===today?'is-today':'')+(dow===0||dow===6?' is-weekend':'');
+      return `<div class="g-grid-day ${cls}" style="width:${cellW}px;height:100%"></div>`;
+    }).join('');
+
+    const overdue = t.status!=='done'&&t.status!=='cancelled'&&t.end<today;
+
+    return `<div class="g-body-row">
+      <div class="g-row-label">
+        <div class="g-row-name" title="${esc(t.project+' — '+t.node)}">${esc(t.project)} <span style="font-weight:400;color:var(--text2)">— ${esc(t.node)}</span></div>
+        <div class="g-row-meta">${workers||'—'} · ${t.totalNH.toFixed(0)} н/ч ${overdue?'<span style="color:var(--red)">⚠ просрочено</span>':''}</div>
+      </div>
+      <div class="g-track" style="width:${totalW}px">
+        <div class="g-grid-bg">${gridDays}</div>
+        <div class="g-today-line" style="left:${todayX}px"></div>
+        <div class="g-bar" style="left:${xs}px;width:${bw}px" onclick="openModal(state.tasks.find(x=>x.id==='${t.id}'))" title="${esc(t.project+' — '+t.node)}: ${t.start} → ${t.end}">
+          <div class="g-bar-bg" style="background:${barColor};opacity:0.85"></div>
+          <div class="g-bar-prog" style="width:${progW}px"></div>
+          <div class="g-bar-text">${esc(t.node)} [${t.progress}%]</div>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+
+  container.innerHTML = `<div class="g-wrap">
+    <div class="g-header-row">
+      <div class="g-name-col">Задача / Сотрудники</div>
+      <div class="g-timeline-header" style="width:${totalW}px">
+        <div class="g-months">${monthCells}</div>
+        <div class="g-days">${dayCells}</div>
+      </div>
+    </div>
+    <div class="g-body">${bodyRows}</div>
+  </div>`;
+}
+
+// ═══════════════════════════════════════
+//  ANALYTICS
+// ═══════════════════════════════════════
+function renderAnalytics(){
+  const tasks=state.tasks;
+  const total=tasks.length;
+  const done=tasks.filter(t=>t.status==='done').length;
+  const inprog=tasks.filter(t=>t.status==='inprogress').length;
+  const today=todayISO();
+  const overdue=tasks.filter(t=>t.status!=='done'&&t.status!=='cancelled'&&t.end<today).length;
+  const totalH=tasks.reduce((s,t)=>s+t.totalNH,0);
+
+  document.getElementById('kpi-total').textContent=total;
+  document.getElementById('kpi-done').textContent=done;
+  document.getElementById('kpi-done-pct').textContent=total?(done/total*100).toFixed(0)+'%':'0%';
+  document.getElementById('kpi-inprog').textContent=inprog;
+  document.getElementById('kpi-overdue').textContent=overdue;
+  document.getElementById('kpi-hours').textContent=totalH.toFixed(0);
+
+  // workload bars
+  const wlDiv=document.getElementById('chart-workload');
+  if(!state.workers.length){ wlDiv.innerHTML='<div class="hint">Нет сотрудников</div>'; }
+  else {
+    const wloads=state.workers.map(w=>({ w, h:tasks.filter(t=>t.workerIds.includes(w.id)).reduce((s,t)=>s+t.totalNH/(t.workerIds.length||1),0) }));
+    const maxH=Math.max(1,...wloads.map(x=>x.h));
+    wlDiv.innerHTML=wloads.map(({w,h})=>`
+      <div class="mini-bar-row">
+        <div class="mini-bar-label" title="${esc(w.name)}">${esc(w.name)}</div>
+        <div class="mini-bar-track"><div class="mini-bar-fill" style="width:${(h/maxH*100).toFixed(1)}%;background:${w.color}"></div></div>
+        <div class="mini-bar-val">${h.toFixed(0)}ч</div>
+      </div>`).join('');
+  }
+
+  // donut
+  drawDonut(tasks);
+
+  // timeline mini
+  const tlDiv=document.getElementById('chart-timeline');
+  const sorted=[...tasks].sort((a,b)=>a.start.localeCompare(b.start)).slice(0,8);
+  if(!sorted.length){ tlDiv.innerHTML='<div class="hint">Нет задач</div>'; }
+  else {
+    const minD=new Date(sorted[0].start+'T00:00:00').getTime();
+    const maxD=Math.max(...sorted.map(t=>new Date(t.end+'T00:00:00').getTime()));
+    const range=Math.max(1,maxD-minD);
+    tlDiv.innerHTML=sorted.map(t=>{
+      const w=state.workers.find(x=>x.id===t.workerIds[0]);
+      const c=w?w.color:'var(--accent)';
+      const s=new Date(t.start+'T00:00:00').getTime();
+      const e=new Date(t.end+'T00:00:00').getTime();
+      const lp=((s-minD)/range*100).toFixed(1);
+      const wp=((e-s)/range*100).toFixed(1);
+      return `<div class="tl-mini-row">
+        <div class="tl-mini-name" title="${esc(t.node)}">${esc(t.node)}</div>
+        <div class="tl-mini-track">
+          <div class="tl-mini-bar" style="left:${lp}%;width:${wp}%;background:${c}55;border:1px solid ${c}80">
+            <span>${t.progress}%</span>
+          </div>
+        </div>
+        <div class="tl-mini-pct">${diffDays(t.start,t.end)}д</div>
+      </div>`;
+    }).join('');
+  }
+
+  // priority bars
+  const prioDiv=document.getElementById('chart-priority');
+  const ph=tasks.filter(t=>t.priority==='high').length;
+  const pm=tasks.filter(t=>t.priority==='medium').length;
+  const pl=tasks.filter(t=>t.priority==='low').length;
+  const maxP=Math.max(1,ph,pm,pl);
+  prioDiv.innerHTML=[
+    {l:'🔴 Высокий',v:ph,c:'var(--red)'},
+    {l:'🟡 Средний',v:pm,c:'var(--yellow)'},
+    {l:'🟢 Низкий', v:pl,c:'var(--green)'}
+  ].map(({l,v,c})=>`<div class="mini-bar-row">
+    <div class="mini-bar-label">${l}</div>
+    <div class="mini-bar-track"><div class="mini-bar-fill" style="width:${(v/maxP*100).toFixed(1)}%;background:${c}"></div></div>
+    <div class="mini-bar-val">${v}</div>
+  </div>`).join('');
+
+  // progress bars
+  const progDiv=document.getElementById('chart-progress');
+  const slots=[{l:'100%',min:100,max:101},{l:'75–99%',min:75,max:100},{l:'50–74%',min:50,max:75},{l:'1–49%',min:1,max:50},{l:'0%',min:0,max:1}];
+  const maxS=Math.max(1,...slots.map(s=>tasks.filter(t=>t.progress>=s.min&&t.progress<s.max).length));
+  progDiv.innerHTML=slots.map(s=>{
+    const v=tasks.filter(t=>t.progress>=s.min&&t.progress<s.max).length;
+    const c=s.min>=100?'var(--green)':s.min>=75?'#22d3ee':s.min>=50?'var(--accent)':s.min>=1?'var(--yellow)':'var(--text3)';
+    return `<div class="mini-bar-row">
+      <div class="mini-bar-label">${s.l}</div>
+      <div class="mini-bar-track"><div class="mini-bar-fill" style="width:${(v/maxS*100).toFixed(1)}%;background:${c}"></div></div>
+      <div class="mini-bar-val">${v}</div>
+    </div>`;
+  }).join('');
+}
+
+function drawDonut(tasks){
+  const canvas=document.getElementById('donut-canvas');
+  const ctx=canvas.getContext('2d');
+  ctx.clearRect(0,0,160,160);
+
+  const counts={pending:0,inprogress:0,done:0,hold:0,cancelled:0};
+  tasks.forEach(t=>counts[t.status]=(counts[t.status]||0)+1);
+  const colors={pending:'#64748b',inprogress:'#3b82f6',done:'#22c55e',hold:'#eab308',cancelled:'#ef4444'};
+  const labels={pending:'Ожидает',inprogress:'В работе',done:'Готово',hold:'Пауза',cancelled:'Отменено'};
+
+  const total=tasks.length||1;
+  let startAngle=-Math.PI/2;
+  const cx=80,cy=80,r=65,ir=42;
+
+  Object.entries(counts).forEach(([k,v])=>{
+    if(!v) return;
+    const angle=(v/total)*Math.PI*2;
+    ctx.beginPath(); ctx.moveTo(cx,cy); ctx.arc(cx,cy,r,startAngle,startAngle+angle);
+    ctx.closePath(); ctx.fillStyle=colors[k]; ctx.fill();
+    startAngle+=angle;
+  });
+  // inner circle
+  ctx.beginPath(); ctx.arc(cx,cy,ir,0,Math.PI*2);
+  ctx.fillStyle='#161b27'; ctx.fill();
+
+  // center text
+  ctx.fillStyle='#e2e8f0'; ctx.font='bold 18px Inter,sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.fillText(tasks.length,cx,cy-7);
+  ctx.fillStyle='#64748b'; ctx.font='11px Inter,sans-serif';
+  ctx.fillText('задач',cx,cy+10);
+
+  // legend
+  const leg=document.getElementById('donut-legend');
+  leg.innerHTML=Object.entries(counts).filter(([,v])=>v>0).map(([k,v])=>`
+    <div class="donut-leg-item"><div class="donut-leg-dot" style="background:${colors[k]}"></div>${labels[k]}: <b>${v}</b></div>`).join('');
+}
+
+// ═══════════════════════════════════════
+//  EXPORT
+// ═══════════════════════════════════════
+function exportJSON(){
+  const blob=new Blob([JSON.stringify(state,null,2)],{type:'application/json'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='assembly-planner.json'; a.click();
+  notify('📦 JSON экспортирован');
+}
+function importJSONFile(){
+  const inp=document.createElement('input'); inp.type='file'; inp.accept='application/json';
+  inp.onchange=async()=>{
+    try {
+      const text=await inp.files[0].text(); const obj=JSON.parse(text);
+      if(!obj.tasks||!obj.workers){ notify('❌ Неверный формат','red'); return; }
+      state=obj; applySettings(); renderAll(); saveLS(); notify('📂 Импортировано');
+    } catch(e){ notify('❌ Ошибка: '+e.message,'red'); }
+  };
+  inp.click();
+}
+
+function exportExcel(){
+  if(!window.XLSX){ notify('❌ XLSX не загружен','red'); return; }
+  const rows=state.tasks.map(t=>({
+    'ID':t.id, 'Проект':t.project, 'Узел':t.node,
+    'Кол-во':t.qty, 'Н/ч на узел':t.norm, 'Всего н/ч':t.totalNH,
+    'Старт':t.start, 'Финиш':t.end, 'Дней':diffDays(t.start,t.end),
+    'Приоритет':t.priority, 'Статус':t.status, 'Прогресс%':t.progress,
+    'Сотрудники':t.workerIds.map(id=>state.workers.find(x=>x.id===id)?.name||id).join(', '),
+    'Комментарий':t.comment
+  }));
+  const ws=XLSX.utils.json_to_sheet(rows);
+  const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'Задачи');
+  XLSX.writeFile(wb,'assembly-planner.xlsx');
+  notify('📊 Excel экспортирован');
+}
+
+// ═══════════════════════════════════════
+//  NOTIFY
+// ═══════════════════════════════════════
+function notify(msg,type='green'){
+  const el=document.createElement('div'); el.className='notif';
+  el.style.borderColor=type==='red'?'var(--red)':type==='orange'?'var(--orange)':'var(--green)';
+  el.textContent=msg; document.body.appendChild(el);
+  setTimeout(()=>el.remove(),2800);
+}
+
+// ═══════════════════════════════════════
+//  RENDER ALL
+// ═══════════════════════════════════════
+function renderAll(){
+  renderTable();
+  renderFormChecklist();
+  renderDepList();
+  renderAnalytics();
+  renderWorkers();
+}
+
+// ═══════════════════════════════════════
+//  INIT
+// ═══════════════════════════════════════
+document.getElementById('edit-modal').addEventListener('click',function(e){ if(e.target===this) closeModal(); });
+
+loadLS();
+applySettings();
+document.getElementById('f-start').value=state.settings.defaultStart||todayISO();
+renderAll();
+</script>
+</body>
+</html>
